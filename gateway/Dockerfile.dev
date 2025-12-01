@@ -1,0 +1,19 @@
+FROM node:18-alpine
+
+RUN addgroup -g 1001 -S nodejs && adduser -S backend -u 1001
+
+WORKDIR /app
+
+COPY package*.json ./
+
+RUN npm ci --include=dev
+
+COPY . .
+
+RUN chown -R backend:nodejs /app
+
+USER backend
+
+EXPOSE 5921
+
+CMD ["npm", "run", "dev"]
