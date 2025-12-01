@@ -1,7 +1,7 @@
 services:
   mongodb:
     image: mongo:latest
-    container_name: mongodb-devopsss
+    container_name: mongodb-devopsss-prod
     restart: always
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
@@ -27,7 +27,7 @@ services:
     build:
       context: ../backend
       dockerfile: Dockerfile
-    container_name: backend-devopsss
+    container_name: backend-devopsss-prod
     environment:
       NODE_ENV: ${NODE_ENV}
       MONGO_URI: mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongodb:27017/${MONGO_DATABASE}?authSource=admin
@@ -49,7 +49,7 @@ services:
     build:
       context: ../gateway
       dockerfile: Dockerfile
-    container_name: gateway-devopsss
+    container_name: gateway-devopsss-prod
     restart: always
     environment:
       NODE_ENV: ${NODE_ENV}
