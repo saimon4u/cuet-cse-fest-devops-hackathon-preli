@@ -1,6 +1,73 @@
-# services:
-  # backend:
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb-devopsss
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE}
+    volumes:
+      - mongodb-data-prod:/data/db
+    networks:
+      - network-devopsss
+    healthcheck:
+      test: [
+        "CMD", 
+        "mongosh", 
+        "--eval", 
+        "db.adminCommand('ping')"
+      ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
 
-  # gateway:
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: backend-devopsss
+    environment:
+      NODE_ENV: ${NODE_ENV}
+      MONGO_URI: mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongodb:27017/${MONGO_DATABASE}?authSource=admin
+      MONGO_DATABASE: ${MONGO_DATABASE}
+      BACKEND_PORT: ${BACKEND_PORT}
+    networks:
+      - network-devopsss
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3847/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1); }).on('error', () => process.exit(1));"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
 
-  # mongo:
+  gateway:
+    build:
+      context: ../gateway
+      dockerfile: Dockerfile
+    container_name: gateway-devopsss
+    restart: always
+    environment:
+      NODE_ENV: ${NODE_ENV}
+      GATEWAY_PORT: ${GATEWAY_PORT}
+      BACKEND_URL: http://backend:${BACKEND_PORT}
+    ports:
+      - "${GATEWAY_PORT}:${GATEWAY_PORT}"
+    networks:
+      - network-devopsss
+    depends_on:
+      backend:
+        condition: service_healthy
+
+networks:
+  network-devopsss:
+    driver: bridge
+    name: network-devopsss
+
+volumes:
+  mongodb-data-prod:
+    name: mongodb-data-prod-devopsss

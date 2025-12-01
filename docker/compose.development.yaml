@@ -1,6 +1,81 @@
-# services:
-  # backend:
+services:
+  mongodb:
+    image: mongo:5-focal
+    container_name: mongodb-devopsss
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE}
+    volumes:
+      - mongodb-data-dev:/data/db
+    networks:
+      - network-devopsss
+    healthcheck:
+      test: [
+        "CMD", 
+        "mongo", 
+        "--quiet", 
+        "mongodb://localhost:27017/db", 
+        "--eval", 
+        "quit(db.runCommand({ping: 1}).ok ? 0 : 1)"
+      ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
 
-  # gateway:
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.dev
+    container_name: backend-devopsss
+    volumes:
+      - ../backend:/app
+      - /app/node_modules
+    environment:
+      NODE_ENV: ${NODE_ENV}
+      MONGO_URI: mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongodb:27017/${MONGO_DATABASE}?authSource=admin
+      MONGO_DATABASE: ${MONGO_DATABASE}
+      BACKEND_PORT: ${BACKEND_PORT}
+    networks:
+      - network-devopsss
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3847/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1); }).on('error', () => process.exit(1));"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
 
-  # mongo:
+  gateway:
+    build:
+      context: ../gateway
+      dockerfile: Dockerfile.dev
+    container_name: gateway-devopsss
+    restart: always
+    volumes:
+      - ../gateway:/app
+      - /app/node_modules
+    environment:
+      NODE_ENV: ${NODE_ENV}
+      GATEWAY_PORT: ${GATEWAY_PORT}
+      BACKEND_URL: http://backend:${BACKEND_PORT}
+    ports:
+      - "${GATEWAY_PORT}:${GATEWAY_PORT}"
+    networks:
+      - network-devopsss
+    depends_on:
+      backend:
+        condition: service_healthy
+
+networks:
+  network-devopsss:
+    driver: bridge
+    name: network-devopsss
+
+volumes:
+  mongodb-data-dev:
+    name: mongodb-data-dev-devopsss
